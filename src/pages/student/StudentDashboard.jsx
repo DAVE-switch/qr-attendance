@@ -1,0 +1,264 @@
+import { useEffect, useState } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
+import { Link } from 'react-router-dom'
+
+function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
+  const { profile, logout } = useAuth()
+  const nav = [
+    { id: 'overview', icon: '📊', label: 'Overview' },
+    { id: 'history',  icon: '📋', label: 'My Attendance' },
+  ]
+  
+  const handleNavClick = (navId) => {
+    setActive(navId)
+    closeMobileMenu()
+  }
+  
+  const handleLogout = () => {
+    logout()
+    closeMobileMenu()
+  }
+  
+  return (
+    <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+      <div className="sidebar-logo">
+        <div className="nav-logo-mark">QR</div>
+        <div className="sidebar-logo-text">
+          <h2>AttendanceIQ</h2>
+          <p>Student Portal</p>
+        </div>
+      </div>
+      <nav className="sidebar-nav">
+        {nav.map(n => (
+          <button key={n.id} className={active === n.id ? 'active' : ''}
+            onClick={() => handleNavClick(n.id)}>
+            <span className="nav-icon">{n.icon}</span> {n.label}
+          </button>
+        ))}
+        <div className="sidebar-divider" />
+        <button onClick={handleLogout} style={{ color: '#ef4444' }}>
+          <span className="nav-icon">🚪</span> Sign Out
+        </button>
+      </nav>
+      <div className="sidebar-user">
+        <div className="sidebar-user-avatar" style={{ background: '#7c3aed' }}>
+          {profile?.full_name?.[0]}
+        </div>
+        <div className="sidebar-user-name">{profile?.full_name}</div>
+        <div className="sidebar-user-role">{profile?.index_number}</div>
+      </div>
+    </aside>
+  )
+}
+
+function Overview({ profile, stats }) {
+  return (
+    <div>
+      <div className="page-header">
+        <h1>My Dashboard</h1>
+        <p>Welcome, {profile?.full_name?.split(' ')[0]} — here's your attendance summary</p>
+      </div>
+
+      {/* SCAN CTA */}
+      <div className="scan-cta-card">
+        <div className="scan-cta-left">
+          <div className="scan-cta-icon">📱</div>
+          <div>
+            <div className="scan-cta-title">Ready to mark attendance?</div>
+            <div className="scan-cta-sub">
+              Ask your lecturer to display the session QR code, then tap below to scan it.
+            </div>
+          </div>
+        </div>
+        <Link to="/scan" className="btn btn-primary scan-cta-btn">
+          Scan QR Code →
+        </Link>
+      </div>
+
+      <div className="stats-grid" style={{ marginBottom: 24 }}>
+        {[
+          { icon: '✅', label: 'Total Present',   value: stats.total },
+          { icon: '📅', label: 'This Week',        value: stats.week },
+          { icon: '📆', label: 'This Month',       value: stats.month },
+        ].map((s, i) => (
+          <div className="stat-card" key={i}>
+            <div className="stat-card-icon">{s.icon}</div>
+            <div className="stat-card-value">{s.value}</div>
+            <div className="stat-card-label">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Profile Card */}
+      <div className="card">
+        <div className="card-title">My Profile</div>
+        <div className="profile-grid">
+          {[
+            { label: 'Full Name',     value: profile?.full_name },
+            { label: 'Index Number',  value: profile?.index_number },
+            { label: 'Email',         value: profile?.email },
+            { label: 'Phone',         value: profile?.phone || '—' },
+          ].map((r, i) => (
+            <div className="profile-row" key={i}>
+              <div className="profile-label">{r.label}</div>
+              <div className="profile-value">{r.value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AttendanceHistory({ studentId }) {
+  const [list, setList] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase.from('attendance')
+      .select('*, sessions(course_name, duration_minutes)')
+      .eq('student_id', studentId)
+      .order('scanned_at', { ascending: false })
+      .then(({ data }) => { setList(data || []); setLoading(false) })
+  }, [studentId])
+
+  return (
+    <div>
+      <div className="page-header">
+        <h1>My Attendance</h1>
+        <p>All sessions you have attended</p>
+      </div>
+      <div className="card">
+        {loading ? (
+          <div className="empty-state"><p>Loading...</p></div>
+        ) : list.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📋</div>
+            <p>No attendance recorded yet. Scan a QR code in class to get started.</p>
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Course</th>
+                  <th>Index Number</th>
+                  <th>Time Scanned</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((a, i) => (
+                  <tr key={a.id}>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{i + 1}</td>
+                    <td style={{ fontWeight: 600 }}>{a.sessions?.course_name}</td>
+                    <td><code className="code-chip">{a.index_number}</code></td>
+                    <td style={{ fontWeight: 600 }}>
+                      {new Date(a.scanned_at).toLocaleTimeString('en-US', {
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                      })}
+                    </td>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                      {new Date(a.scanned_at).toLocaleDateString('en-GB', {
+                        day: 'numeric', month: 'short', year: 'numeric'
+                      })}
+                    </td>
+                    <td><span className="badge badge-active">✓ Present</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function StudentDashboard() {
+  const [active, setActive] = useState('overview')
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 })
+  const [history, setHistory] = useState([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    const { data } = supabase.auth.getUser()
+    setProfile(data.user)
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (!profile) return
+    loadStats()
+    loadHistory()
+  }, [profile])
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase
+      .channel('attendance-student')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'attendance',
+        filter: `student_id=eq.${supabase.auth.getUser().then(({ data }) => data.user?.id)}`
+      }, payload => {
+        setHistory(prev => [payload.new, ...prev])
+        loadStats()
+        toast.success('Attendance recorded successfully!')
+      })
+      .subscribe()
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen)
+  }
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false)
+  }
+
+  const loadStats = async () => {
+    const { data } = await supabase.from('attendance')
+      .select('scanned_at, status').eq('student_id', profile.id)
+    if (!data) return
+    const now = new Date()
+    const weekAgo  = new Date(now - 7  * 86400000)
+    const monthAgo = new Date(now - 30 * 86400000)
+    setStats({
+      total: data.length,
+      present: data.filter(a => a.status === 'present').length,
+      late: data.filter(a => a.status === 'late').length,
+      absent: data.filter(a => a.status === 'absent').length,
+    })
+  }
+
+  const loadHistory = async () => {
+    const { data } = await supabase.from('attendance')
+      .select('*, sessions(course_name, duration_minutes)')
+      .eq('student_id', profile.id)
+      .order('scanned_at', { ascending: false })
+    setHistory(data || [])
+  }
+
+  return (
+    <div className="dashboard-layout">
+      {/* Mobile hamburger menu button */}
+      <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
+        {mobileMenuOpen ? '✕' : '☰'}
+      </button>
+      
+      {/* Mobile overlay */}
+      <div className={`mobile-overlay ${mobileMenuOpen ? 'active' : ''}`} onClick={closeMobileMenu} />
+      
+      <Sidebar active={active} setActive={setActive} mobileMenuOpen={mobileMenuOpen} closeMobileMenu={closeMobileMenu} />
+      <main className="main-content">
+        {active === 'overview' && <Overview profile={profile} stats={stats} />}
+        {active === 'history'  && <AttendanceHistory studentId={profile?.id} />}
+      </main>
+    </div>
+  )
+}
