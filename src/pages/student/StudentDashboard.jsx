@@ -3,25 +3,14 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { Link } from 'react-router-dom'
 
-function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
+function Sidebar({ active, setActive }) {
   const { profile, logout } = useAuth()
   const nav = [
     { id: 'overview', icon: '📊', label: 'Overview' },
     { id: 'history',  icon: '📋', label: 'My Attendance' },
   ]
-  
-  const handleNavClick = (navId) => {
-    setActive(navId)
-    closeMobileMenu()
-  }
-  
-  const handleLogout = () => {
-    logout()
-    closeMobileMenu()
-  }
-  
   return (
-    <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+    <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="nav-logo-mark">QR</div>
         <div className="sidebar-logo-text">
@@ -32,12 +21,12 @@ function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
       <nav className="sidebar-nav">
         {nav.map(n => (
           <button key={n.id} className={active === n.id ? 'active' : ''}
-            onClick={() => handleNavClick(n.id)}>
+            onClick={() => setActive(n.id)}>
             <span className="nav-icon">{n.icon}</span> {n.label}
           </button>
         ))}
         <div className="sidebar-divider" />
-        <button onClick={handleLogout} style={{ color: '#ef4444' }}>
+        <button onClick={logout} style={{ color: '#ef4444' }}>
           <span className="nav-icon">🚪</span> Sign Out
         </button>
       </nav>
@@ -60,7 +49,6 @@ function Overview({ profile, stats }) {
         <p>Welcome, {profile?.full_name?.split(' ')[0]} — here's your attendance summary</p>
       </div>
 
-      {/* SCAN CTA */}
       <div className="scan-cta-card">
         <div className="scan-cta-left">
           <div className="scan-cta-icon">📱</div>
@@ -71,16 +59,16 @@ function Overview({ profile, stats }) {
             </div>
           </div>
         </div>
-        <Link to="/scan" className="btn btn-primary scan-cta-btn">
+        <Link to="/scan" className="btn scan-cta-btn">
           Scan QR Code →
         </Link>
       </div>
 
       <div className="stats-grid" style={{ marginBottom: 24 }}>
         {[
-          { icon: '✅', label: 'Total Present',   value: stats.total },
-          { icon: '📅', label: 'This Week',        value: stats.week },
-          { icon: '📆', label: 'This Month',       value: stats.month },
+          { icon: '✅', label: 'Total Present',  value: stats.total },
+          { icon: '📅', label: 'This Week',       value: stats.week },
+          { icon: '📆', label: 'This Month',      value: stats.month },
         ].map((s, i) => (
           <div className="stat-card" key={i}>
             <div className="stat-card-icon">{s.icon}</div>
@@ -90,15 +78,14 @@ function Overview({ profile, stats }) {
         ))}
       </div>
 
-      {/* Profile Card */}
       <div className="card">
         <div className="card-title">My Profile</div>
         <div className="profile-grid">
           {[
-            { label: 'Full Name',     value: profile?.full_name },
-            { label: 'Index Number',  value: profile?.index_number },
-            { label: 'Email',         value: profile?.email },
-            { label: 'Phone',         value: profile?.phone || '—' },
+            { label: 'Full Name',    value: profile?.full_name },
+            { label: 'Index Number', value: profile?.index_number },
+            { label: 'Email',        value: profile?.email },
+            { label: 'Phone',        value: profile?.phone || '—' },
           ].map((r, i) => (
             <div className="profile-row" key={i}>
               <div className="profile-label">{r.label}</div>
@@ -112,15 +99,20 @@ function Overview({ profile, stats }) {
 }
 
 function AttendanceHistory({ studentId }) {
-  const [list, setList] = useState([])
+  const [list, setList]       = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('attendance')
+    if (!studentId) return
+    supabase
+      .from('attendance')
       .select('*, sessions(course_name, duration_minutes)')
       .eq('student_id', studentId)
       .order('scanned_at', { ascending: false })
-      .then(({ data }) => { setList(data || []); setLoading(false) })
+      .then(({ data, error }) => {
+        if (!error) setList(data || [])
+        setLoading(false)
+      })
   }, [studentId])
 
   return (
@@ -179,82 +171,32 @@ function AttendanceHistory({ studentId }) {
 }
 
 export default function StudentDashboard() {
-  const [active, setActive] = useState('overview')
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, present: 0, late: 0, absent: 0 })
-  const [history, setHistory] = useState([])
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { profile }           = useAuth()
+  const [active, setActive]   = useState('overview')
+  const [stats, setStats]     = useState({ total: 0, week: 0, month: 0 })
 
   useEffect(() => {
-    const { data } = supabase.auth.getUser()
-    setProfile(data.user)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => {
-    if (!profile) return
-    loadStats()
-    loadHistory()
-  }, [profile])
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase
-      .channel('attendance-student')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'attendance',
-        filter: `student_id=eq.${supabase.auth.getUser().then(({ data }) => data.user?.id)}`
-      }, payload => {
-        setHistory(prev => [payload.new, ...prev])
-        loadStats()
-        toast.success('Attendance recorded successfully!')
-      })
-      .subscribe()
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false)
-  }
-
-  const loadStats = async () => {
-    const { data } = await supabase.from('attendance')
-      .select('scanned_at, status').eq('student_id', profile.id)
-    if (!data) return
-    const now = new Date()
-    const weekAgo  = new Date(now - 7  * 86400000)
-    const monthAgo = new Date(now - 30 * 86400000)
-    setStats({
-      total: data.length,
-      present: data.filter(a => a.status === 'present').length,
-      late: data.filter(a => a.status === 'late').length,
-      absent: data.filter(a => a.status === 'absent').length,
-    })
-  }
-
-  const loadHistory = async () => {
-    const { data } = await supabase.from('attendance')
-      .select('*, sessions(course_name, duration_minutes)')
+    if (!profile?.id) return
+    supabase
+      .from('attendance')
+      .select('scanned_at')
       .eq('student_id', profile.id)
-      .order('scanned_at', { ascending: false })
-    setHistory(data || [])
-  }
+      .then(({ data, error }) => {
+        if (error || !data) return
+        const now      = new Date()
+        const weekAgo  = new Date(now - 7  * 86400000)
+        const monthAgo = new Date(now - 30 * 86400000)
+        setStats({
+          total: data.length,
+          week:  data.filter(a => new Date(a.scanned_at) > weekAgo).length,
+          month: data.filter(a => new Date(a.scanned_at) > monthAgo).length,
+        })
+      })
+  }, [profile?.id])
 
   return (
     <div className="dashboard-layout">
-      {/* Mobile hamburger menu button */}
-      <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
-        {mobileMenuOpen ? '✕' : '☰'}
-      </button>
-      
-      {/* Mobile overlay */}
-      <div className={`mobile-overlay ${mobileMenuOpen ? 'active' : ''}`} onClick={closeMobileMenu} />
-      
-      <Sidebar active={active} setActive={setActive} mobileMenuOpen={mobileMenuOpen} closeMobileMenu={closeMobileMenu} />
+      <Sidebar active={active} setActive={setActive} />
       <main className="main-content">
         {active === 'overview' && <Overview profile={profile} stats={stats} />}
         {active === 'history'  && <AttendanceHistory studentId={profile?.id} />}
