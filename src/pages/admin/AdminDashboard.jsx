@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import MobileTopBar from '../../components/MobileTopBar'
 
 /* ── SIDEBAR ── */
-function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
+function Sidebar({ active, setActive }) {
   const { profile, logout } = useAuth()
   const nav = [
     { id: 'overview',  icon: '📊', label: 'Overview' },
@@ -13,19 +14,8 @@ function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
     { id: 'students',  icon: '🎓', label: 'Students' },
     { id: 'sessions',  icon: '📋', label: 'All Sessions' },
   ]
-  
-  const handleNavClick = (navId) => {
-    setActive(navId)
-    closeMobileMenu()
-  }
-  
-  const handleLogout = () => {
-    logout()
-    closeMobileMenu()
-  }
-  
   return (
-    <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+    <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="nav-logo-mark">QR</div>
         <div className="sidebar-logo-text">
@@ -38,13 +28,13 @@ function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
           <button
             key={n.id}
             className={active === n.id ? 'active' : ''}
-            onClick={() => handleNavClick(n.id)}
+            onClick={() => setActive(n.id)}
           >
             <span className="nav-icon">{n.icon}</span> {n.label}
           </button>
         ))}
         <div className="sidebar-divider" />
-        <button onClick={handleLogout} style={{ color: '#ef4444' }}>
+        <button onClick={logout} style={{ color: '#ef4444' }}>
           <span className="nav-icon">🚪</span> Sign Out
         </button>
       </nav>
@@ -65,7 +55,7 @@ function Overview({ stats }) {
     <div>
       <div className="page-header">
         <h1>Dashboard Overview</h1>
-        <p>Welcome back — here's what's happening at GCU</p>
+        <p>Welcome back — here's what's happening at GCUC</p>
       </div>
       <div className="stats-grid">
         {[
@@ -105,7 +95,7 @@ function Overview({ stats }) {
         <div className="card-title">System Info</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {[
-            { label: 'Institution', value: 'Garden City University' },
+            { label: 'Institution', value: 'Garden City University College' },
             { label: 'System',      value: 'QR Attendance — AttendanceIQ' },
             { label: 'Academic Year', value: '2025 / 2026' },
             { label: 'Admin Role',  value: 'Full Access' },
@@ -144,18 +134,11 @@ function PendingApprovals({ onAction }) {
   const handle = async (id, action) => {
     setActing(id + action)
     const status = action === 'approve' ? 'active' : 'rejected'
-    const { error, data } = await supabase
-      .from('profiles').update({ status }).eq('id', id).select().single()
-    if (error) { 
-      toast.error('Action failed: ' + error.message); 
-    }
+    const { error } = await supabase
+      .from('profiles').update({ status }).eq('id', id)
+    if (error) { toast.error('Action failed'); }
     else {
-      const lecturerName = data?.full_name || 'Lecturer'
-      if (action === 'approve') {
-        toast.success(`${lecturerName} approved successfully! ✓`)
-      } else {
-        toast.error(`${lecturerName} rejected`)
-      }
+      toast.success(action === 'approve' ? 'Lecturer approved ✓' : 'Lecturer rejected')
       load()
       onAction()
     }
@@ -241,39 +224,10 @@ function Lecturers() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
-  const loadLecturers = async () => {
-    const { data } = await supabase.from('profiles').select('*').eq('role', 'lecturer')
-      .order('created_at', { ascending: false })
-    setList(data || [])
-    setLoading(false)
-  }
-
   useEffect(() => {
-    loadLecturers()
-    
-    // Listen for profile changes to update list in real-time
-    const channel = supabase.channel('lecturers-list-changes')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'profiles',
-        filter: 'role=eq.lecturer'
-      }, (payload) => {
-        if (payload.eventType === 'UPDATE') {
-          setList(prev => prev.map(lecturer => 
-            lecturer.id === payload.new.id ? payload.new : lecturer
-          ))
-        } else if (payload.eventType === 'INSERT') {
-          setList(prev => [payload.new, ...prev])
-        } else if (payload.eventType === 'DELETE') {
-          setList(prev => prev.filter(lecturer => lecturer.id !== payload.old.id))
-        }
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    supabase.from('profiles').select('*').eq('role', 'lecturer')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setList(data || []); setLoading(false) })
   }, [])
 
   const filtered = list.filter(l =>
@@ -502,15 +456,6 @@ function Sessions() {
 export default function AdminDashboard() {
   const [active, setActive] = useState('overview')
   const [stats, setStats] = useState({ students: 0, lecturers: 0, pending: 0, sessions: 0 })
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false)
-  }
 
   const loadStats = async () => {
     const [s, l, p, sess] = await Promise.all([
@@ -527,46 +472,13 @@ export default function AdminDashboard() {
     })
   }
 
-  useEffect(() => {
-    loadStats()
-    
-    // Listen for profile status changes to update stats in real-time
-    const channel = supabase.channel('admin-profile-changes')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'profiles',
-        filter: 'role=eq.lecturer'
-      }, (payload) => {
-        // Reload stats when lecturer status changes
-        loadStats()
-        
-        // Show notification for status changes
-        if (payload.new.status === 'active' && payload.old.status === 'pending') {
-          toast.success(`${payload.new.full_name} has been approved!`)
-        } else if (payload.new.status === 'rejected' && payload.old.status === 'pending') {
-          toast.error(`${payload.new.full_name} has been rejected`)
-        }
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+  useEffect(() => { loadStats() }, [])
 
   return (
     <div className="dashboard-layout">
-      {/* Mobile hamburger menu button */}
-      <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
-        {mobileMenuOpen ? '✕' : '☰'}
-      </button>
-      
-      {/* Mobile overlay */}
-      <div className={`mobile-overlay ${mobileMenuOpen ? 'active' : ''}`} onClick={closeMobileMenu} />
-      
-      <Sidebar active={active} setActive={setActive} mobileMenuOpen={mobileMenuOpen} closeMobileMenu={closeMobileMenu} />
+      <Sidebar active={active} setActive={setActive} />
       <main className="main-content">
+        <MobileTopBar title="Admin Portal" />
         {active === 'overview'  && <Overview stats={stats} />}
         {active === 'pending'   && <PendingApprovals onAction={loadStats} />}
         {active === 'lecturers' && <Lecturers />}

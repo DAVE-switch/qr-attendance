@@ -3,28 +3,18 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
+import MobileTopBar from '../../components/MobileTopBar'
 
 /* ── SIDEBAR ── */
-function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
+function Sidebar({ active, setActive }) {
   const { profile, logout } = useAuth()
   const nav = [
     { id: 'overview',       icon: '📊', label: 'Overview' },
     { id: 'create',         icon: '➕', label: 'New Session' },
     { id: 'sessions',       icon: '📋', label: 'My Sessions' },
   ]
-  
-  const handleNavClick = (navId) => {
-    setActive(navId)
-    closeMobileMenu()
-  }
-  
-  const handleLogout = () => {
-    logout()
-    closeMobileMenu()
-  }
-  
   return (
-    <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+    <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="nav-logo-mark">QR</div>
         <div className="sidebar-logo-text">
@@ -35,12 +25,12 @@ function Sidebar({ active, setActive, mobileMenuOpen, closeMobileMenu }) {
       <nav className="sidebar-nav">
         {nav.map(n => (
           <button key={n.id} className={active === n.id ? 'active' : ''}
-            onClick={() => handleNavClick(n.id)}>
+            onClick={() => setActive(n.id)}>
             <span className="nav-icon">{n.icon}</span> {n.label}
           </button>
         ))}
         <div className="sidebar-divider" />
-        <button onClick={handleLogout} style={{ color: '#ef4444' }}>
+        <button onClick={logout} style={{ color: '#ef4444' }}>
           <span className="nav-icon">🚪</span> Sign Out
         </button>
       </nav>
@@ -144,7 +134,7 @@ function CreateSession({ onCreated }) {
         <h1>New Session</h1>
         <p>Generate a QR code for your class</p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="create-session-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
 
         {/* FORM */}
         <div className="card">
@@ -393,7 +383,7 @@ function LiveSession({ session, onBack }) {
         <p>Live attendance session</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
+      <div className="live-session-grid" style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
 
         {/* QR PANEL */}
         <div className="card" style={{ textAlign: 'center' }}>
@@ -466,7 +456,7 @@ function LiveSession({ session, onBack }) {
                       </td>
                       <td><code className="code-chip">{a.index_number}</code></td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: center, gap: 10 }}>
                           <div className="table-avatar" style={{ background: '#7c3aed' }}>
                             {a.student_name?.[0]}
                           </div>
@@ -579,15 +569,6 @@ export default function LecturerDashboard() {
   const [active, setActive] = useState('overview')
   const [refreshKey, setRefreshKey] = useState(0)
   const [stats, setStats] = useState({ sessions: 0, live: 0, attendances: 0 })
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false)
-  }
 
   useEffect(() => {
     if (!profile) return
@@ -615,16 +596,9 @@ export default function LecturerDashboard() {
 
   return (
     <div className="dashboard-layout">
-      {/* Mobile hamburger menu button */}
-      <button className="mobile-menu-btn" onClick={toggleMobileMenu}>
-        {mobileMenuOpen ? '✕' : '☰'}
-      </button>
-      
-      {/* Mobile overlay */}
-      <div className={`mobile-overlay ${mobileMenuOpen ? 'active' : ''}`} onClick={closeMobileMenu} />
-      
-      <Sidebar active={active} setActive={setActive} mobileMenuOpen={mobileMenuOpen} closeMobileMenu={closeMobileMenu} />
+      <Sidebar active={active} setActive={setActive} />
       <main className="main-content">
+      <MobileTopBar title="Lecturer Portal" />
         {active === 'overview' && <Overview stats={stats} setActive={setActive} />}
         {active === 'create'   && <CreateSession onCreated={handleCreated} />}
         {active === 'sessions' && <MySessions lecturerId={profile?.id} refreshKey={refreshKey} />}

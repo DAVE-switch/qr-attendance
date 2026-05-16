@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { Link } from 'react-router-dom'
+import MobileTopBar from '../../components/MobileTopBar'
 
 function Sidebar({ active, setActive }) {
   const { profile, logout } = useAuth()
@@ -198,6 +199,7 @@ export default function StudentDashboard() {
     <div className="dashboard-layout">
       <Sidebar active={active} setActive={setActive} />
       <main className="main-content">
+      <MobileTopBar title="Student Portal" />
         {active === 'overview' && <Overview profile={profile} stats={stats} />}
         {active === 'history'  && <AttendanceHistory studentId={profile?.id} />}
       </main>
