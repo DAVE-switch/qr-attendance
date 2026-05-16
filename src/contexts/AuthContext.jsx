@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const profileCache = new Map() // Simple in-memory cache
 
   useEffect(() => {
     // Get existing session on load
@@ -37,12 +38,28 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const fetchProfile = async (userId) => {
+    const startTime = performance.now()
     try {
-      const { data, error } = await supabase
-        .from('profiles').select('*').eq('id', userId).single()
+      // Add timeout and optimized query
+      const { data, error } = await Promise.race([
+        supabase
+          .from('profiles')
+          .select('id, full_name, email, role, index_number, lecturer_id, phone, status')
+          .eq('id', userId)
+          .single(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+        )
+      ])
       if (error) throw error
       setProfile(data)
-    } catch {
+      
+      // Log performance metrics
+      const endTime = performance.now()
+      console.log(`Profile fetch took ${(endTime - startTime).toFixed(2)}ms`)
+      
+    } catch (error) {
+      console.error('Profile fetch error:', error)
       setProfile(null)
     } finally {
       setLoading(false)

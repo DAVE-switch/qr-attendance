@@ -16,7 +16,10 @@ export default function Login() {
     setLoading(true)
     try {
       await login(email, password)
-      navigate('/dashboard')
+      // Wait a moment for auth state to settle before navigation
+      setTimeout(() => {
+        navigate('/dashboard')
+      }, 100)
     } catch (err) {
       toast.error(err.message || 'Invalid email or password')
       setLoading(false)
