@@ -1,25 +1,24 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const [email, setEmail] = useState('')
+  const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]   = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirect = searchParams.get('redirect') || '/dashboard'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
       await login(email, password)
-      // Wait a moment for auth state to settle before navigation
-      setTimeout(() => {
-        navigate('/dashboard')
-      }, 100)
+      navigate(redirect)
     } catch (err) {
       toast.error(err.message || 'Invalid email or password')
       setLoading(false)
@@ -28,8 +27,6 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-
-      {/* ── LEFT: FORM ── */}
       <div className="auth-left">
         <div className="auth-left-inner">
 
@@ -55,21 +52,17 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleSubmit} className="auth-form">
-
             <div className="field">
               <label>Email address</label>
               <div className="field-wrap">
                 <svg className="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
                     stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
-                  <polyline points="22,6 12,13 2,6" stroke="currentColor"
-                    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <input
-                  type="email" value={email}
+                <input type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com" required
-                />
+                  placeholder="you@example.com" required />
               </div>
             </div>
 
@@ -78,14 +71,11 @@ export default function Login() {
               <div className="field-wrap">
                 <svg className="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor"
-                    strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
-                <input
-                  type={showPass ? 'text' : 'password'} value={password}
+                <input type={showPass ? 'text' : 'password'} value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password" required
-                />
+                  placeholder="Enter your password" required />
                 <button type="button" className="field-eye" onClick={() => setShowPass(p => !p)}>
                   {showPass
                     ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
@@ -99,47 +89,35 @@ export default function Login() {
               {loading && <span className="btn-spinner" />}
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
-
           </form>
 
           <div className="auth-divider"><span>or</span></div>
-
           <p className="auth-switch">
             Don't have an account? <Link to="/register">Register here</Link>
           </p>
 
           <div className="auth-roles-hint">
-            <div className="hint-item">
-              <span>🎓</span> Students register with their index number
-            </div>
-            <div className="hint-item">
-              <span>🧑‍🏫</span> Lecturers need admin approval after signup
-            </div>
+            <div className="hint-item"><span>🎓</span> Students register with their index number</div>
+            <div className="hint-item"><span>🧑‍🏫</span> Lecturers need admin approval after signup</div>
           </div>
 
         </div>
       </div>
 
-      {/* ── RIGHT: BRANDED PANEL ── */}
       <div className="auth-right">
         <div className="auth-right-bg" />
         <div className="auth-right-glow" />
         <div className="auth-right-inner">
           <div className="auth-panel-badge">Garden City University</div>
-          <h2 className="auth-panel-title">
-            Attendance<br />made simple.
-          </h2>
-          <p className="auth-panel-sub">
-            QR codes. GPS verification. Live dashboards.
-            Built for GCU students and lecturers.
-          </p>
+          <h2 className="auth-panel-title">Attendance<br />made simple.</h2>
+          <p className="auth-panel-sub">QR codes. GPS verification. Live dashboards. Built for GCUC.</p>
           <div className="auth-panel-checks">
             {[
               'Mark attendance in under 3 seconds',
               'GPS prevents proxy marking',
               'Live feed shows each student\'s arrival',
               'Export sessions to CSV anytime',
-              'Admin controls who has lecturer access',
+              'Admin controls lecturer access',
             ].map((t, i) => (
               <div className="auth-check-row" key={i}>
                 <div className="auth-check-icon">✓</div>
@@ -147,7 +125,6 @@ export default function Login() {
               </div>
             ))}
           </div>
-          {/* Decorative mini-card */}
           <div className="auth-deco-card">
             <div className="auth-deco-row">
               <div className="auth-deco-dot" />
@@ -161,7 +138,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-
     </div>
   )
 }
