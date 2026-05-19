@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -30,15 +30,20 @@ export default function ScanPage() {
     setMsg(String(text))
   }
 
+  // Stable navigate function to prevent re-renders
+  const stableNavigate = useCallback((path, options) => {
+    navigate(path, options)
+  }, [])
+
   useEffect(() => {
-    // Always show loading state initially
+    // Always show loading state immediately
     if (authLoading) {
       setStep('waiting')
       return
     }
     
     if (!profile) { 
-      navigate(`/login?redirect=/scan/${token}`); 
+      stableNavigate(`/login?redirect=/scan/${token}`); 
       return 
     }
     
@@ -55,7 +60,7 @@ export default function ScanPage() {
     if (hasRun.current) return   // prevent double-run
     hasRun.current = { token, ran: true }
     runScan(profile, token)
-  }, [authLoading, profile, token, navigate])
+  }, [authLoading, profile, token, stableNavigate])
 
   // ── main scan logic — ALL errors caught ──
   async function runScan(prof, tok) {
@@ -97,7 +102,7 @@ export default function ScanPage() {
       // Wrap geolocation in a Promise so we can await it and catch properly
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+          enableHighAccuracy: true, timeout: 8000, maximumAge: 0  // Reduced timeout
         })
       }).catch(err => {
         if (err.code === 1) showError('Location access denied. Please allow location in your browser settings and tap Try Again.')
@@ -190,6 +195,7 @@ export default function ScanPage() {
       justifyContent:'center', flexWrap:'wrap' },
   }
 
+  // ALWAYS render something - never return blank
   return (
     <div style={S.page}>
       <div style={S.card}>
@@ -218,12 +224,15 @@ export default function ScanPage() {
         {/* Course */}
         {course && <div style={S.course}>{course}</div>}
 
-        {/* States */}
+        {/* States - ALWAYS show something */}
         {(authLoading || step === 'waiting') && (
           <div style={S.center}>
             <div style={S.icon}>⏳</div>
             <div style={{ ...S.title, color:'#64748b' }}>Loading...</div>
             <div style={S.spinner} />
+            <p style={{ fontSize:12, color:'#64748b', marginTop:6 }}>
+              {authLoading ? 'Checking authentication...' : 'Preparing scanner...'}
+            </p>
           </div>
         )}
 
@@ -232,6 +241,9 @@ export default function ScanPage() {
             <div style={S.icon}>🔍</div>
             <div style={{ ...S.title, color:'#1a56db' }}>Verifying QR Code</div>
             <div style={S.spinner} />
+            <p style={{ fontSize:12, color:'#64748b', marginTop:6 }}>
+              Validating session...
+            </p>
           </div>
         )}
 
@@ -251,6 +263,9 @@ export default function ScanPage() {
             <div style={S.icon}>✏️</div>
             <div style={{ ...S.title, color:'#1a56db' }}>Saving Attendance</div>
             <div style={S.spinner} />
+            <p style={{ fontSize:12, color:'#64748b', marginTop:6 }}>
+              Recording your presence...
+            </p>
           </div>
         )}
 
