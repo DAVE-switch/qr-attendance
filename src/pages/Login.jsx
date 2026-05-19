@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 export default function Login() {
@@ -9,34 +10,61 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [waitingForProfile, setWaitingForProfile] = useState(false)
+  const timeoutRef = useRef(null)
 
-  const { login, profile, user } = useAuth()
-  const navigate     = useNavigate()
+  const { login, profile, logout } = useAuth()
+  const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
 
-  // Once we have a profile, navigate — works on ALL browsers
+  // Navigate as soon as profile loads
   useEffect(() => {
     if (waitingForProfile && profile) {
+      clearTimeout(timeoutRef.current)
       navigate(redirect, { replace: true })
     }
-  }, [waitingForProfile, profile, redirect])
+  }, [waitingForProfile, profile])
+
+  // Clean up timeout on unmount
+  useEffect(() => () => clearTimeout(timeoutRef.current), [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
+
     try {
+      // Sign out any existing session first to avoid conflicts
+      await logout()
+      await new Promise(r => setTimeout(r, 300))
+
       await login(email, password)
-      // Don't navigate immediately — wait for profile to load via useEffect
       setWaitingForProfile(true)
+      setLoading(false)
+
+      // Safety timeout — if profile doesn't load in 8 seconds, stop and show error
+      timeoutRef.current = setTimeout(async () => {
+        // Try fetching profile manually one more time
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data } = await supabase
+            .from('profiles').select('*').eq('id', user.id).maybeSingle()
+          if (data) {
+            navigate(`/${data.role}`, { replace: true })
+            return
+          }
+        }
+        setWaitingForProfile(false)
+        toast.error('Profile load timed out. Please try again.')
+      }, 8000)
+
     } catch (err) {
       toast.error(err.message || 'Invalid email or password')
       setLoading(false)
     }
   }
 
-  // Show waiting spinner while profile loads after login
-  if (waitingForProfile && !profile) {
+  // Waiting spinner screen
+  if (waitingForProfile) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
@@ -44,12 +72,16 @@ export default function Login() {
         background: 'linear-gradient(135deg, #080f1e 0%, #1e3a5f 100%)'
       }}>
         <div style={{
-          width: 44, height: 44, border: '3px solid rgba(255,255,255,0.2)',
+          width: 48, height: 48, border: '3px solid rgba(255,255,255,0.15)',
           borderTopColor: 'white', borderRadius: '50%',
           animation: 'spin 0.7s linear infinite'
         }} />
-        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'sans-serif' }}>
+        <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15,
+          fontFamily: 'sans-serif', fontWeight: 600 }}>
           Signing you in…
+        </p>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontFamily: 'sans-serif' }}>
+          Loading your profile
         </p>
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
       </div>
@@ -94,7 +126,7 @@ export default function Login() {
                 </svg>
                 <input type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com" required />
+                  placeholder="you@example.com" required autoComplete="email" />
               </div>
             </div>
 
@@ -108,11 +140,11 @@ export default function Login() {
                 </svg>
                 <input type={showPass ? 'text' : 'password'} value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password" required />
+                  placeholder="Enter your password" required autoComplete="current-password" />
                 <button type="button" className="field-eye"
                   onClick={() => setShowPass(p => !p)}>
                   {showPass
-                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8 11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                     : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/></svg>
                   }
                 </button>
@@ -142,9 +174,7 @@ export default function Login() {
         <div className="auth-right-inner">
           <div className="auth-panel-badge">Garden City University</div>
           <h2 className="auth-panel-title">Attendance<br />made simple.</h2>
-          <p className="auth-panel-sub">
-            QR codes. GPS verification. Live dashboards. Built for GCUC.
-          </p>
+          <p className="auth-panel-sub">QR codes. GPS verification. Live dashboards. Built for GCUC.</p>
           <div className="auth-panel-checks">
             {[
               'Mark attendance in under 3 seconds',
