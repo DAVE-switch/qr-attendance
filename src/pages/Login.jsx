@@ -1,28 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Login() {
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
-  const { login } = useAuth()
-  const navigate = useNavigate()
+  const [waitingForProfile, setWaitingForProfile] = useState(false)
+
+  const { login, profile, user } = useAuth()
+  const navigate     = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect') || '/dashboard'
+
+  // Once we have a profile, navigate — works on ALL browsers
+  useEffect(() => {
+    if (waitingForProfile && profile) {
+      navigate(redirect, { replace: true })
+    }
+  }, [waitingForProfile, profile, redirect])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
       await login(email, password)
-      navigate(redirect)
+      // Don't navigate immediately — wait for profile to load via useEffect
+      setWaitingForProfile(true)
     } catch (err) {
       toast.error(err.message || 'Invalid email or password')
       setLoading(false)
     }
+  }
+
+  // Show waiting spinner while profile loads after login
+  if (waitingForProfile && !profile) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 16,
+        background: 'linear-gradient(135deg, #080f1e 0%, #1e3a5f 100%)'
+      }}>
+        <div style={{
+          width: 44, height: 44, border: '3px solid rgba(255,255,255,0.2)',
+          borderTopColor: 'white', borderRadius: '50%',
+          animation: 'spin 0.7s linear infinite'
+        }} />
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'sans-serif' }}>
+          Signing you in…
+        </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
   }
 
   return (
@@ -58,7 +89,8 @@ export default function Login() {
                 <svg className="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"
                     stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
-                  <polyline points="22,6 12,13 2,6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="22,6 12,13 2,6" stroke="currentColor"
+                    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <input type="email" value={email}
                   onChange={e => setEmail(e.target.value)}
@@ -71,12 +103,14 @@ export default function Login() {
               <div className="field-wrap">
                 <svg className="field-icon" width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor"
+                    strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
                 <input type={showPass ? 'text' : 'password'} value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Enter your password" required />
-                <button type="button" className="field-eye" onClick={() => setShowPass(p => !p)}>
+                <button type="button" className="field-eye"
+                  onClick={() => setShowPass(p => !p)}>
                   {showPass
                     ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                     : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/></svg>
@@ -95,12 +129,10 @@ export default function Login() {
           <p className="auth-switch">
             Don't have an account? <Link to="/register">Register here</Link>
           </p>
-
           <div className="auth-roles-hint">
             <div className="hint-item"><span>🎓</span> Students register with their index number</div>
             <div className="hint-item"><span>🧑‍🏫</span> Lecturers need admin approval after signup</div>
           </div>
-
         </div>
       </div>
 
@@ -110,7 +142,9 @@ export default function Login() {
         <div className="auth-right-inner">
           <div className="auth-panel-badge">Garden City University</div>
           <h2 className="auth-panel-title">Attendance<br />made simple.</h2>
-          <p className="auth-panel-sub">QR codes. GPS verification. Live dashboards. Built for GCUC.</p>
+          <p className="auth-panel-sub">
+            QR codes. GPS verification. Live dashboards. Built for GCUC.
+          </p>
           <div className="auth-panel-checks">
             {[
               'Mark attendance in under 3 seconds',
