@@ -456,7 +456,7 @@ function LiveSession({ session, onBack }) {
                       </td>
                       <td><code className="code-chip">{a.index_number}</code></td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: center, gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div className="table-avatar" style={{ background: '#7c3aed' }}>
                             {a.student_name?.[0]}
                           </div>

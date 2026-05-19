@@ -31,13 +31,31 @@ export default function ScanPage() {
   }
 
   useEffect(() => {
-    if (authLoading) return
-    if (!profile) { navigate(`/login?redirect=/scan/${token}`); return }
-    if (profile.role !== 'student') { showError('Only students can scan.'); return }
+    // Always show loading state initially
+    if (authLoading) {
+      setStep('waiting')
+      return
+    }
+    
+    if (!profile) { 
+      navigate(`/login?redirect=/scan/${token}`); 
+      return 
+    }
+    
+    if (profile.role !== 'student') { 
+      showError('Only students can scan.'); 
+      return 
+    }
+    
+    // Reset hasRun when token changes to allow re-scanning with new QR
+    if (hasRun.current && hasRun.current.token !== token) {
+      hasRun.current = false
+    }
+    
     if (hasRun.current) return   // prevent double-run
-    hasRun.current = true
+    hasRun.current = { token, ran: true }
     runScan(profile, token)
-  }, [authLoading, profile])
+  }, [authLoading, profile, token, navigate])
 
   // ── main scan logic — ALL errors caught ──
   async function runScan(prof, tok) {
@@ -260,7 +278,14 @@ export default function ScanPage() {
                 msg.includes('timed out') || msg.includes('unavailable') ||
                 msg.includes('Try Again')) && (
                 <button style={S.btnPrimary}
-                  onClick={() => { hasRun.current = false; setStep('waiting'); runScan(profile, token) }}>
+                  onClick={() => { 
+                    hasRun.current = false; 
+                    setStep('waiting'); 
+                    setMsg(''); 
+                    setCourse(''); 
+                    // Small delay to ensure state reset
+                    setTimeout(() => runScan(profile, token), 100);
+                  }}>
                   🔄 Try Again
                 </button>
               )}
