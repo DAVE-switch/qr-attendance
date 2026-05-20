@@ -1,126 +1,69 @@
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Link } from 'react-router-dom'
 
 export default function ScanCamera() {
-  const [status, setStatus] = useState('starting') // starting | scanning | error
-  const [errorMsg, setErrorMsg] = useState('')
-  const scannerRef = useRef(null)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    const scanner = new Html5Qrcode('qr-reader')
-    scannerRef.current = scanner
-
-    Html5Qrcode.getCameras()
-      .then(cameras => {
-        if (!cameras || cameras.length === 0) {
-          setStatus('error')
-          setErrorMsg('No camera found on this device.')
-          return
-        }
-
-        // prefer back camera on mobile
-        const cam = cameras.find(c =>
-          c.label.toLowerCase().includes('back') ||
-          c.label.toLowerCase().includes('rear') ||
-          c.label.toLowerCase().includes('environment')
-        ) || cameras[cameras.length - 1]
-
-        return scanner.start(
-          cam.id,
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0,
-          },
-          (decodedText) => {
-            scanner.stop().catch(() => {})
-            const match = decodedText.match(/\/scan\/([^/\s?#]+)/)
-            const token = match ? match[1] : decodedText.trim()
-            navigate(`/scan/${token}`)
-          },
-          () => {} // ignore non-QR frames silently
-        )
-      })
-      .then(() => setStatus('scanning'))
-      .catch(err => {
-        setStatus('error')
-        if (err?.message?.includes('Permission') || err?.message?.includes('permission')) {
-          setErrorMsg('Camera permission denied. Please allow camera access in your browser and reload.')
-        } else {
-          setErrorMsg('Could not start camera. Please check permissions and try again.')
-        }
-      })
-
-    return () => {
-      scannerRef.current?.stop().catch(() => {})
-    }
-  }, [])
-
   return (
-    <div className="scan-page">
-      <div className="scan-card" style={{ maxWidth: 480 }}>
-
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', padding: 16,
+      background: 'linear-gradient(135deg, #080f1e 0%, #1e3a5f 100%)'
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 20, padding: 28,
+        width: '100%', maxWidth: 420, boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+        textAlign: 'center'
+      }}>
         {/* Header */}
-        <div className="scan-header">
-          <div className="nav-logo-mark">QR</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--dark)' }}>Scan QR Code</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Garden City University · AttendanceIQ</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 10, marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid #e2e8f0' }}>
+          <div style={{ width: 36, height: 36, background: '#1a56db', color: 'white',
+            borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: 13 }}>QR</div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>AttendanceIQ</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>Garden City University</div>
           </div>
         </div>
 
-        {/* Instructions */}
-        <div style={{
-          background: '#eff6ff', border: '1px solid #bfdbfe',
-          borderRadius: 10, padding: '10px 14px', marginBottom: 20,
-          fontSize: 13, color: '#1d4ed8', textAlign: 'center'
-        }}>
-          📋 Point your camera at the QR code on the projector to mark attendance
-        </div>
-
-        {/* Camera view */}
-        {status === 'starting' && (
-          <div style={{
-            height: 300, background: '#0f172a', borderRadius: 12,
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: 14,
-            marginBottom: 16, color: 'white'
-          }}>
-            <div className="scan-spinner" />
-            <p style={{ fontSize: 13, color: '#94a3b8' }}>Starting camera...</p>
-          </div>
-        )}
-
-        {status === 'error' && (
-          <div style={{ marginBottom: 16 }}>
-            <div className="scan-message scan-message-error">{errorMsg}</div>
-            <button
-              className="btn btn-primary"
-              style={{ width: '100%', marginTop: 12 }}
-              onClick={() => window.location.reload()}
-            >
-              🔄 Retry
-            </button>
-          </div>
-        )}
-
-        {/* The actual scanner renders here */}
-        <div id="qr-reader" style={{
-          width: '100%',
-          display: status === 'error' ? 'none' : 'block'
-        }} />
-
-        <p style={{
-          textAlign: 'center', fontSize: 12,
-          color: 'var(--text-muted)', marginTop: 16
-        }}>
-          Keep the QR code steady and well-lit for best results
+        <div style={{ fontSize: 56, marginBottom: 16 }}>📱</div>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+          How to Scan
+        </h2>
+        <p style={{ fontSize: 14, color: '#64748b', lineHeight: 1.7, marginBottom: 24 }}>
+          Use your phone's <strong>built-in camera app</strong> to scan
+          the QR code displayed by your lecturer.
         </p>
 
-        <Link to="/student" className="btn btn-ghost"
-          style={{ display: 'block', textAlign: 'center', marginTop: 12 }}>
+        {/* Steps */}
+        {[
+          { n: '1', t: 'Open your Camera app', d: 'Use the default camera that came with your phone' },
+          { n: '2', t: 'Point at the QR code',  d: 'Aim at the QR code on the projector or screen' },
+          { n: '3', t: 'Tap the link',           d: 'Your phone will show a banner — tap "Open in Chrome"' },
+          { n: '4', t: 'Attendance recorded',    d: 'You will see a green confirmation screen' },
+        ].map((s, i) => (
+          <div key={i} style={{ display: 'flex', gap: 14, alignItems: 'flex-start',
+            textAlign: 'left', marginBottom: 16,
+            paddingBottom: 16, borderBottom: i < 3 ? '1px solid #f1f5f9' : 'none' }}>
+            <div style={{ width: 30, height: 30, background: '#eff6ff', color: '#1a56db',
+              borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{s.n}</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a', marginBottom: 2 }}>{s.t}</div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>{s.d}</div>
+            </div>
+          </div>
+        ))}
+
+        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe',
+          borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+          fontSize: 13, color: '#1d4ed8' }}>
+          💡 Make sure you are logged in to AttendanceIQ before scanning
+        </div>
+
+        <Link to="/student" style={{
+          display: 'block', background: '#1a56db', color: 'white',
+          padding: '12px', borderRadius: 8, fontWeight: 600, fontSize: 14,
+          textDecoration: 'none'
+        }}>
           ← Back to Dashboard
         </Link>
       </div>
